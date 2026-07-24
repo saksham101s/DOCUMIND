@@ -35,6 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${fraunces.variable} ${ibmPlexMono.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-ink text-white font-sans selection:bg-marker selection:text-ink">

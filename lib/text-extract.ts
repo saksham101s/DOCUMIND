@@ -59,21 +59,57 @@ async function extractDocx(buffer: Buffer): Promise<ExtractedDocument> {
 }
 
 async function extractPdf(buffer: Buffer): Promise<ExtractedDocument> {
-  // pdf-parse is CJS; dynamic import keeps it out of the client bundle.
-  const pdfParseModule = (await import("pdf-parse")) as any;
-  const pdfParse = pdfParseModule.default || pdfParseModule;
-  const data = await pdfParse(buffer);
-  const fullText = (data.text as string).trim();
+  // Dynamically import pdf-parse (supports both v2 class API and v1 legacy function API)
+  const pdfModule = (await import("pdf-parse")) as any;
+  const PDFParseClass =
+    pdfModule.PDFParse ||
+    pdfModule.default?.PDFParse ||
+    pdfModule.default ||
+    pdfModule;
 
-  // pdf-parse exposes per-page text in some builds via numpages only;
-  // split heuristically on form-feed if present, else treat as single doc.
-  const pageParts = fullText.includes("\f")
-    ? fullText.split("\f").map((p) => p.trim()).filter(Boolean)
-    : null;
+  // v2.x Class-based API (new PDFParse({ data }))
+  if (
+    typeof PDFParseClass === "function" &&
+    PDFParseClass.prototype?.getText
+  ) {
+    const uint8Array = new Uint8Array(buffer);
+    const parser = new PDFParseClass({ data: uint8Array });
+    try {
+      const textResult = await parser.getText();
+      const fullText = (textResult.text || "").trim();
+      const pageParts =
+        textResult.pages
+          ?.map((p: any) => (p.text || "").trim())
+          .filter(Boolean) || null;
 
-  return {
-    text: fullText,
-    pages: pageParts,
-    pageCount: data.numpages ?? pageParts?.length ?? null,
-  };
+      return {
+        text: fullText,
+        pages: pageParts,
+        pageCount: textResult.total || pageParts?.length || null,
+      };
+    } finally {
+      if (typeof parser.destroy === "function") {
+        await parser.destroy();
+      }
+    }
+  }
+
+  // v1.x Legacy Function API (pdfParse(buffer))
+  if (typeof PDFParseClass === "function") {
+    const data = await PDFParseClass(buffer);
+    const fullText = (data.text as string || "").trim();
+    const pageParts = fullText.includes("\f")
+      ? fullText.split("\f").map((p) => p.trim()).filter(Boolean)
+      : null;
+
+    return {
+      text: fullText,
+      pages: pageParts,
+      pageCount: data.numpages ?? pageParts?.length ?? null,
+    };
+  }
+
+  throw new Error(
+    "PDF text extraction failed: Invalid pdf-parse library export.",
+  );
 }
