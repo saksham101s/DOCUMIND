@@ -1,26 +1,87 @@
 @import "tailwindcss";
+@config "../tailwind.config.ts";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #12151c;
+  --ink-soft: #1a1e29;
+  --paper: #f3eee2;
+  --paper-line: #ded6c2;
+  --marker: #d7f26d;
+  --rule: #7c8cf8;
+  --muted: #8b92a3;
+  --ink-on-paper: #1e2430;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-ink: #12151c;
+  --color-ink-soft: #1a1e29;
+  --color-paper: #f3eee2;
+  --color-paper-line: #ded6c2;
+  --color-marker: #d7f26d;
+  --color-rule: #7c8cf8;
+  --color-muted: #8b92a3;
+  --color-ink-on-paper: #1e2430;
+
+  --font-display: var(--font-fraunces), serif;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-mono-label: var(--font-mono), monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  background-color: #12151c;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #12151c;
+  color: #eae7de;
+  font-family: var(--font-inter), sans-serif;
+}
+
+.font-mono-label {
+  font-family: var(--font-mono), monospace;
+  letter-spacing: 0.08em;
+}
+
+.font-display {
+  font-family: var(--font-fraunces), serif;
+}
+
+@keyframes highlight-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.highlight-mark {
+  position: relative;
+  display: inline-block;
+}
+
+.highlight-mark::before {
+  content: "";
+  position: absolute;
+  left: -0.15em;
+  right: -0.15em;
+  bottom: 0.06em;
+  height: 0.34em;
+  background: var(--marker);
+  transform-origin: left;
+  animation: highlight-sweep 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.4s both;
+  z-index: -1;
+  border-radius: 2px;
+}
+
+.dash-connector {
+  border-left: 1.5px dashed var(--paper-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlight-mark::before {
+    animation: none;
+    transform: scaleX(1);
+  }
 }
