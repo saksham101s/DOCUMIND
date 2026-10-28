@@ -45,8 +45,18 @@ export async function GET(request: Request) {
       );
     }
 
-    let activeChatId: string | null = chatId;
-    if (!activeChatId) {
+    let activeChatId: string | null = null;
+    if (chatId) {
+      // Only honour a client-supplied chatId the user owns for this document.
+      const ownedChat = await queryOne<{ id: string }>(
+        `SELECT id FROM chats WHERE id = $1 AND document_id = $2 AND user_id = $3`,
+        [chatId, documentId, user.id],
+      );
+      if (!ownedChat) {
+        return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+      }
+      activeChatId = ownedChat.id;
+    } else {
       const chat = await queryOne<{ id: string }>(
         `SELECT id FROM chats
          WHERE document_id = $1 AND user_id = $2
@@ -100,8 +110,28 @@ export async function POST(request: Request) {
       );
     }
 
-    let activeChatId: string = chatId ?? "";
-    if (!activeChatId) {
+    // Retrieve first so a failed lookup doesn't leave an empty chat / orphan message.
+    const chunks = await retrieveChunks(documentId, message.trim(), 5);
+
+    if (chunks.length === 0) {
+      return NextResponse.json(
+        { error: "No indexed content found for this document." },
+        { status: 422 },
+      );
+    }
+
+    let activeChatId = "";
+    if (chatId) {
+      // Only honour a client-supplied chatId the user owns for this document.
+      const ownedChat = await queryOne<{ id: string }>(
+        `SELECT id FROM chats WHERE id = $1 AND document_id = $2 AND user_id = $3`,
+        [chatId, documentId, user.id],
+      );
+      if (!ownedChat) {
+        return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+      }
+      activeChatId = ownedChat.id;
+    } else {
       const title =
         message.length > 80 ? `${message.slice(0, 77)}…` : message;
       const chat = await queryOne<{ id: string }>(
@@ -124,18 +154,8 @@ export async function POST(request: Request) {
       [activeChatId, message.trim()],
     );
 
-    const chunks = await retrieveChunks(documentId, message.trim(), 5);
-
-    if (chunks.length === 0) {
-      return NextResponse.json(
-        { error: "No indexed content found for this document." },
-        { status: 422 },
-      );
-    }
-
     const encoder = new TextEncoder();
     let citations: CitationRef[] = [];
-    let assistantContent = "";
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -152,7 +172,6 @@ export async function POST(request: Request) {
             question: message.trim(),
             chunks,
             onToken: (token) => {
-              assistantContent += token;
               send("token", { text: token });
             },
           });

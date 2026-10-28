@@ -1,14 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
+import { StorageClient } from "@supabase/storage-js";
 
 const BUCKET = "documents";
 
+/**
+ * Storage-only client. The full supabase-js client also boots a Realtime
+ * client, which throws on Node < 22 (no native WebSocket) — we only need Storage.
+ */
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
   }
-  return createClient(url, key);
+  const storage = new StorageClient(`${url.replace(/\/$/, "")}/storage/v1`, {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  });
+  return { storage };
 }
 
 /** Upload raw file bytes to Supabase Storage and return the public URL path. */

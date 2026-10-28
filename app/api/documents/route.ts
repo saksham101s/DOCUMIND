@@ -6,6 +6,9 @@ import { processDocument } from "@/lib/process-document";
 import { uploadDocumentFile } from "@/lib/storage";
 import { isAllowedFile } from "@/lib/text-extract";
 
+/** Matches the "up to 25MB" promise in UploadDropzone. */
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 export type DocumentRow = {
   id: string;
   filename: string;
@@ -42,6 +45,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Choose a PDF, TXT, or DOCX file to upload." },
         { status: 400 },
+      );
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: "That file is larger than 25MB. Upload a smaller file." },
+        { status: 413 },
       );
     }
 

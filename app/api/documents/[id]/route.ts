@@ -48,7 +48,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await deleteDocumentFiles(user.id, id);
+    // Storage cleanup is best-effort — never block deleting the DB row on it.
+    await deleteDocumentFiles(user.id, id).catch((err) =>
+      console.error("Storage cleanup failed", err),
+    );
     await query(`DELETE FROM documents WHERE id = $1`, [id]);
 
     return NextResponse.json({ ok: true });

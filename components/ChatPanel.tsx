@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CitationTag from "./CitationTag";
 
 export type Citation = {
@@ -37,6 +37,7 @@ export default function ChatPanel({ documentId, documentName }: ChatPanelProps) 
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const tempIdRef = useRef(0);
 
   const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,28 +47,31 @@ export default function ChatPanel({ documentId, documentName }: ChatPanelProps) 
     scrollToBottom();
   }, [messages]);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/chat?documentId=${documentId}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setChatId(data.chatId);
-      setMessages(
-        (data.messages ?? []).map((m: ChatMessage) => ({
-          ...m,
-          role: m.role as "user" | "assistant",
-        })),
-      );
-    } catch {
-      setError("Could not load chat history. Refresh the page.");
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [documentId]);
-
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    let cancelled = false;
+    fetch(`/api/chat?documentId=${documentId}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (cancelled) return;
+        setChatId(data.chatId);
+        setMessages(
+          (data.messages ?? []).map((m: ChatMessage) => ({
+            ...m,
+            role: m.role as "user" | "assistant",
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setError("Could not load chat history. Refresh the page.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
 
   const sendMessage = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
@@ -77,12 +81,13 @@ export default function ChatPanel({ documentId, documentName }: ChatPanelProps) 
     setInput("");
     setStreaming(true);
 
+    tempIdRef.current += 1;
     const userMsg: ChatMessage = {
-      id: `temp-user-${Date.now()}`,
+      id: `temp-user-${tempIdRef.current}`,
       role: "user",
       content: text,
     };
-    const assistantId = `temp-assistant-${Date.now()}`;
+    const assistantId = `temp-assistant-${tempIdRef.current}`;
     setMessages((prev) => [
       ...prev,
       userMsg,
@@ -201,7 +206,7 @@ export default function ChatPanel({ documentId, documentName }: ChatPanelProps) 
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-2.5 bg-ink-soft/40">
         <div className="flex items-center gap-2 text-xs font-mono-label uppercase text-muted">
           <span className="h-2 w-2 rounded-full bg-marker"></span>
-          <span>Engine: RAG (Voyage-3 + Claude 3.5 Sonnet)</span>
+          <span>Engine: RAG (Voyage-3 + Claude Sonnet)</span>
         </div>
         {messages.length > 0 && (
           <button

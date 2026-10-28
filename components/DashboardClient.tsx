@@ -29,7 +29,8 @@ export default function DashboardClient() {
   }, []);
 
   useEffect(() => {
-    fetchDocuments();
+    // Defer to a microtask so the effect body itself doesn't set state synchronously.
+    queueMicrotask(fetchDocuments);
   }, [fetchDocuments]);
 
   // Poll while any document is still indexing.

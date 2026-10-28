@@ -60,6 +60,7 @@ async function extractDocx(buffer: Buffer): Promise<ExtractedDocument> {
 
 async function extractPdf(buffer: Buffer): Promise<ExtractedDocument> {
   // Dynamically import pdf-parse (supports both v2 class API and v1 legacy function API)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pdf-parse v1/v2 export shapes differ
   const pdfModule = (await import("pdf-parse")) as any;
   const PDFParseClass =
     pdfModule.PDFParse ||
@@ -77,10 +78,11 @@ async function extractPdf(buffer: Buffer): Promise<ExtractedDocument> {
     try {
       const textResult = await parser.getText();
       const fullText = (textResult.text || "").trim();
+      // Keep blank pages as "" so array index + 1 stays the real page number
+      // (chunkByPages skips empty pages itself).
       const pageParts =
-        textResult.pages
-          ?.map((p: any) => (p.text || "").trim())
-          .filter(Boolean) || null;
+        textResult.pages?.map((p: { text?: string }) => (p.text || "").trim()) ||
+        null;
 
       return {
         text: fullText,
@@ -99,7 +101,7 @@ async function extractPdf(buffer: Buffer): Promise<ExtractedDocument> {
     const data = await PDFParseClass(buffer);
     const fullText = (data.text as string || "").trim();
     const pageParts = fullText.includes("\f")
-      ? fullText.split("\f").map((p) => p.trim()).filter(Boolean)
+      ? fullText.split("\f").map((p) => p.trim())
       : null;
 
     return {

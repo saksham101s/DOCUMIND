@@ -31,9 +31,12 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx
-  ON document_chunks USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
+-- Retrieval is always scoped to one document (a few hundred chunks), so an
+-- exact scan via the document_id index is fast and has perfect recall. A global
+-- IVFFlat index would scan 1 of 100 lists and then filter by document_id,
+-- often returning fewer than top-k (or zero) chunks. See ISSUES_RESOLVED.md.
+CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx
+  ON document_chunks (document_id);
 
 CREATE TABLE IF NOT EXISTS chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,3 +54,7 @@ CREATE TABLE IF NOT EXISTS messages (
   citations JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS documents_user_id_idx ON documents (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS chats_document_user_idx ON chats (document_id, user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS messages_chat_id_idx ON messages (chat_id, created_at);

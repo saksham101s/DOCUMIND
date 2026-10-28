@@ -34,6 +34,13 @@ describe("chunkText", () => {
     expect(chunks[1]!.content).toContain("Page two");
   });
 
+  it("keeps real page numbers when a page is blank", () => {
+    const pages = ["First page.", "", "Third page."];
+    const chunks = chunkText("", pages, { chunkSize: 500, overlap: 0 });
+
+    expect(chunks.map((c) => c.pageNumber)).toEqual([1, 3]);
+  });
+
   it("returns empty array for blank input", () => {
     expect(chunkText("   ")).toEqual([]);
   });

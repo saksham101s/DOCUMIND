@@ -29,21 +29,23 @@ export async function processDocument(
       const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
       const embeddings = await embedTexts(batch.map((c) => c.content));
 
-      for (let j = 0; j < batch.length; j++) {
-        const chunk = batch[j]!;
-        const embedding = embeddings[j]!;
-        await query(
-          `INSERT INTO document_chunks (document_id, content, embedding, chunk_index, page_number)
-           VALUES ($1, $2, $3::vector, $4, $5)`,
-          [
-            documentId,
-            chunk.content,
-            toVectorLiteral(embedding),
-            chunk.chunkIndex,
-            chunk.pageNumber,
-          ],
+      // One multi-row INSERT per batch instead of one round trip per chunk.
+      const params: unknown[] = [documentId];
+      const rows = batch.map((chunk, j) => {
+        const base = params.length;
+        params.push(
+          chunk.content,
+          toVectorLiteral(embeddings[j]!),
+          chunk.chunkIndex,
+          chunk.pageNumber,
         );
-      }
+        return `($1, $${base + 1}, $${base + 2}::vector, $${base + 3}, $${base + 4})`;
+      });
+      await query(
+        `INSERT INTO document_chunks (document_id, content, embedding, chunk_index, page_number)
+         VALUES ${rows.join(", ")}`,
+        params,
+      );
     }
 
     await query(

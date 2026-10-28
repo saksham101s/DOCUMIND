@@ -71,7 +71,8 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   try {
     const result = await getPool().query<T>(text, params);
     return result.rows;
-  } catch (err: any) {
+  } catch (caught) {
+    const err = caught as { code?: string; message?: string } | undefined;
     if (err?.code === "ENOTFOUND" || err?.message?.includes("ENOTFOUND")) {
       throw new Error(
         `Database connection failed (ENOTFOUND). Please verify your DATABASE_URL hostname in .env.local is correct.`,

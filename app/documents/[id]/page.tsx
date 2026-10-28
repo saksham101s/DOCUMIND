@@ -2,7 +2,7 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import ChatPanel from "@/components/ChatPanel";
-import { requireDbUser } from "@/lib/auth";
+import { AuthError, requireDbUser } from "@/lib/auth";
 import { queryOne } from "@/lib/db";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -11,8 +11,10 @@ export default async function DocumentChatPage({ params }: PageProps) {
   let user;
   try {
     user = await requireDbUser();
-  } catch {
-    redirect("/sign-in");
+  } catch (err) {
+    // There is no /sign-in route (Clerk uses modals); real DB errors should surface.
+    if (err instanceof AuthError) redirect("/");
+    throw err;
   }
 
   const { id } = await params;

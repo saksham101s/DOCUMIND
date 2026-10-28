@@ -21,26 +21,23 @@ export default function UploadDropzone({ onUploaded }: UploadDropzoneProps) {
       setUploading(true);
       setProgressStage("Uploading to storage...");
 
+      // Stage feedback simulation
+      const timer1 = setTimeout(() => {
+        setProgressStage("Extracting document text & pages...");
+      }, 1200);
+
+      const timer2 = setTimeout(() => {
+        setProgressStage("Generating Voyage 1024-dim embeddings & indexing...");
+      }, 2800);
+
       try {
         const formData = new FormData();
         formData.append("file", file);
-
-        // Stage feedback simulation
-        const timer1 = setTimeout(() => {
-          setProgressStage("Extracting document text & pages...");
-        }, 1200);
-
-        const timer2 = setTimeout(() => {
-          setProgressStage("Generating Voyage 1024-dim embeddings & indexing...");
-        }, 2800);
 
         const res = await fetch("/api/documents", {
           method: "POST",
           body: formData,
         });
-
-        clearTimeout(timer1);
-        clearTimeout(timer2);
 
         const data = await res.json();
         if (!res.ok) {
@@ -48,7 +45,6 @@ export default function UploadDropzone({ onUploaded }: UploadDropzoneProps) {
         }
 
         setSelectedFile(null);
-        onUploaded();
       } catch (err) {
         setError(
           err instanceof Error
@@ -56,7 +52,12 @@ export default function UploadDropzone({ onUploaded }: UploadDropzoneProps) {
             : "Upload failed. Check the file format and try again.",
         );
       } finally {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
         setUploading(false);
+        // Refresh even on failure: a document that failed processing still
+        // exists with status "error" and should show up in the list.
+        onUploaded();
       }
     },
     [onUploaded],
@@ -103,7 +104,11 @@ export default function UploadDropzone({ onUploaded }: UploadDropzoneProps) {
           type="file"
           accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            // Reset so picking the same file again (e.g. after an error) re-fires onChange.
+            e.target.value = "";
+          }}
         />
 
         {uploading ? (
